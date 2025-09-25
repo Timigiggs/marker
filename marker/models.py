@@ -16,10 +16,12 @@ from surya.settings import settings as surya_settings
 def create_model_dict(
     device=None, dtype=None, attention_implementation: str | None = None
 ) -> dict:
+    foundation_predictor = FoundationPredictor(device=device, dtype=dtype, attention_implementation=attention_implementation)
     return {
-        "layout_model": LayoutPredictor(FoundationPredictor(checkpoint=surya_settings.LAYOUT_MODEL_CHECKPOINT, attention_implementation=attention_implementation, device=device, dtype=dtype)),
-        "recognition_model": RecognitionPredictor(FoundationPredictor(checkpoint=surya_settings.RECOGNITION_MODEL_CHECKPOINT, attention_implementation=attention_implementation, device=device, dtype=dtype)),
-        "table_rec_model": TableRecPredictor(device=device, dtype=dtype),
+        "foundation_model": foundation_predictor,
+        "layout_model": LayoutPredictor(foundation_predictor),
+        "recognition_model": RecognitionPredictor(foundation_predictor),
+        "table_rec_model": TableRecPredictor(foundation_predictor),
         "detection_model": DetectionPredictor(device=device, dtype=dtype),
         "ocr_error_model": OCRErrorPredictor(device=device, dtype=dtype),
     }
