@@ -49,13 +49,20 @@ class LayoutBuilder(BaseBuilder):
         super().__init__(config)
 
     def __call__(self, document: Document, provider: PdfProvider):
+        self.process_pages(document, provider, document.pages)
+        self.expand_layout_blocks(document)
+
+    def process_pages(
+        self, document: Document, provider: PdfProvider, pages: List[PageGroup]
+    ):
+        if not pages:
+            return
         if self.force_layout_block is not None:
             # Assign the full content of every page to a single layout type
-            layout_results = self.forced_layout(document.pages)
+            layout_results = self.forced_layout(pages)
         else:
-            layout_results = self.surya_layout(document.pages)
-        self.add_blocks_to_pages(document.pages, layout_results)
-        self.expand_layout_blocks(document)
+            layout_results = self.surya_layout(pages)
+        self.add_blocks_to_pages(pages, layout_results)
 
     def get_batch_size(self):
         if self.layout_batch_size is not None:

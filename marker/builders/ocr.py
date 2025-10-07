@@ -80,7 +80,18 @@ class OcrBuilder(BaseBuilder):
         self.recognition_model = recognition_model
 
     def __call__(self, document: Document, provider: PdfProvider):
-        pages_to_ocr = [page for page in document.pages if page.text_extraction_method == 'surya']
+        self.process_pages(document, provider, document.pages)
+
+    def process_pages(
+        self, document: Document, provider: PdfProvider, pages: List[PageGroup]
+    ):
+        if not pages:
+            return
+        pages_to_ocr = [
+            page for page in pages if page.text_extraction_method == "surya"
+        ]
+        if not pages_to_ocr:
+            return
         ocr_page_images, block_polygons, block_ids, block_original_texts = (
             self.get_ocr_images_polygons_ids(document, pages_to_ocr, provider)
         )

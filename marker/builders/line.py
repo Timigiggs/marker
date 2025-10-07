@@ -94,10 +94,17 @@ class LineBuilder(BaseBuilder):
         self.ocr_error_model = ocr_error_model
 
     def __call__(self, document: Document, provider: PdfProvider):
+        self.process_pages(document, provider, document.pages)
+
+    def process_pages(
+        self, document: Document, provider: PdfProvider, pages: List[PageGroup]
+    ):
+        if not pages:
+            return
         # Disable inline detection for documents where layout model doesn't detect any equations
         # Also disable if we won't use the inline detections (if we aren't using the LLM)
-        provider_lines, ocr_lines = self.get_all_lines(document, provider)
-        self.merge_blocks(document, provider_lines, ocr_lines)
+        provider_lines, ocr_lines = self.get_all_lines(document, provider, pages)
+        self.merge_blocks(document, provider_lines, ocr_lines, pages)
 
     def get_detection_batch_size(self):
         if self.detection_batch_size is not None:
@@ -135,19 +142,27 @@ class LineBuilder(BaseBuilder):
         assert len(run_detection) == len(detection_results)
         return detection_results
 
-    def get_all_lines(self, document: Document, provider: PdfProvider):
+    def get_all_lines(
+        self,
+        document: Document,
+        provider: PdfProvider,
+        pages: List[PageGroup] | None = None,
+    ):
+        if pages is None:
+            pages = document.pages
+
         ocr_error_detection_results = self.ocr_error_detection(
-            document.pages, provider.page_lines
+            pages, provider.page_lines
         )
 
-        boxes_to_ocr = {page.page_id: [] for page in document.pages}
-        page_lines = {page.page_id: [] for page in document.pages}
+        boxes_to_ocr = {page.page_id: [] for page in pages}
+        page_lines = {page.page_id: [] for page in pages}
 
         LineClass: Line = get_block_class(BlockTypes.Line)
 
         layout_good = []
         for document_page, ocr_error_detection_label in zip(
-            document.pages, ocr_error_detection_results.labels
+            pages, ocr_error_detection_results.labels
         ):
             document_page.ocr_errors_detected = ocr_error_detection_label == "bad"
             provider_lines: List[ProviderOutput] = provider.page_lines.get(
@@ -171,7 +186,7 @@ class LineBuilder(BaseBuilder):
         run_detection = [not good for good in layout_good]
         page_images = [
             page.get_image(highres=False, remove_blocks=self.ocr_remove_blocks)
-            for page, bad in zip(document.pages, run_detection)
+            for page, bad in zip(pages, run_detection)
             if bad
         ]
 
@@ -179,9 +194,9 @@ class LineBuilder(BaseBuilder):
         # Detection results and inline detection results are for every page (we use run_detection to make the list full length)
         detection_results = self.get_detection_results(page_images, run_detection)
 
-        assert len(detection_results) == len(layout_good) == len(document.pages)
+        assert len(detection_results) == len(layout_good) == len(pages)
         for document_page, detection_result, provider_lines_good in zip(
-            document.pages, detection_results, layout_good
+            pages, detection_results, layout_good
         ):
             provider_lines: List[ProviderOutput] = provider.page_lines.get(
                 document_page.page_id, []
@@ -209,7 +224,7 @@ class LineBuilder(BaseBuilder):
                 boxes_to_ocr[document_page.page_id].extend(detection_boxes)
 
         # Dummy lines to merge into the document - Contains no spans, will be filled in later by OCRBuilder
-        ocr_lines = {document_page.page_id: [] for document_page in document.pages}
+        ocr_lines = {document_page.page_id: [] for document_page in pages}
         for page_id, page_ocr_boxes in boxes_to_ocr.items():
             page_size = provider.get_page_bbox(page_id).size
             image_size = document.get_page(page_id).get_image(highres=False).size
@@ -348,12 +363,17 @@ class LineBuilder(BaseBuilder):
         document: Document,
         page_provider_lines: ProviderPageLines,
         page_ocr_lines: ProviderPageLines,
+        pages: List[PageGroup] | None = None,
     ):
-        for document_page in document.pages:
-            provider_lines: List[ProviderOutput] = page_provider_lines[
-                document_page.page_id
-            ]
-            ocr_lines: List[ProviderOutput] = page_ocr_lines[document_page.page_id]
+        if pages is None:
+            pages = document.pages
+        for document_page in pages:
+            provider_lines: List[ProviderOutput] = page_provider_lines.get(
+                document_page.page_id, []
+            )
+            ocr_lines: List[ProviderOutput] = page_ocr_lines.get(
+                document_page.page_id, []
+            )
 
             # Only one or the other will have lines
             # Filter out blank lines which come from bad provider boxes, or invisible text
