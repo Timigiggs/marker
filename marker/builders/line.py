@@ -87,7 +87,7 @@ class LineBuilder(BaseBuilder):
     ocr_math_symbol_threshold: Annotated[
         int, "Minimum number of unicode math symbols to consider OCRing the page"
     ] = 1
-    super_sub_threshold: Annotated[
+    ocr_supersub_threshold: Annotated[
         int, "Minimum number of superscript/subscript symbols to consider OCRing the page"
     ] = 3
 
