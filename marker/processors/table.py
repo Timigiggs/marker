@@ -30,7 +30,7 @@ class TableProcessor(BaseProcessor):
     A processor for recognizing tables in the document.
     """
 
-    block_types = (BlockTypes.Table, BlockTypes.TableOfContents, BlockTypes.Form)
+    block_types = (BlockTypes.TableOfContents)
     table_rec_batch_size: Annotated[
         int,
         "The batch size to use for the table recognition model.",
@@ -88,6 +88,8 @@ class TableProcessor(BaseProcessor):
         table_data = []
         for page in document.pages:
             for block in page.contained_blocks(document, self.block_types):
+                if getattr(block, "html", None):
+                    continue
                 if block.block_type == BlockTypes.Table:
                     block.polygon = block.polygon.expand(0.01, 0.01)
                 image = block.get_image(document, highres=True)
@@ -140,6 +142,8 @@ class TableProcessor(BaseProcessor):
         table_idx = 0
         for page in document.pages:
             for block in page.contained_blocks(document, self.block_types):
+                if getattr(block, "html", None):
+                    continue
                 block.structure = []  # Remove any existing lines, spans, etc.
                 cells: List[SuryaTableCell] = tables[table_idx].cells
                 for cell in cells:
@@ -174,6 +178,8 @@ class TableProcessor(BaseProcessor):
                 document, self.contained_block_types
             )
             for block in page.contained_blocks(document, self.block_types):
+                if getattr(block, "html", None):
+                    continue
                 intersections = matrix_intersection_area(
                     [c.polygon.bbox for c in child_contained_blocks],
                     [block.polygon.bbox],

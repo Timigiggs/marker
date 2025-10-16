@@ -46,8 +46,6 @@ class OcrBuilder(BaseBuilder):
         BlockTypes.Equation,
         BlockTypes.Figure,
         BlockTypes.Picture,
-        BlockTypes.Table,
-        BlockTypes.Form,
         BlockTypes.TableOfContents,
     ]
     full_ocr_block_types: Annotated[
@@ -62,6 +60,8 @@ class OcrBuilder(BaseBuilder):
         BlockTypes.TextInlineMath,
         BlockTypes.Code,
         BlockTypes.Caption,
+        BlockTypes.Table,
+        BlockTypes.Form,
     ]
     ocr_task_name: Annotated[
         str,
@@ -105,6 +105,10 @@ class OcrBuilder(BaseBuilder):
     def select_ocr_blocks_by_mode(
         self, page: PageGroup, block: Block, block_lines: List[Block], page_max_intersection_pct: float
     ):
+        if block.block_type == BlockTypes.Table:
+            # Tables are decoded end-to-end, so always run them in block mode
+            return [block]
+
         if any([
             page_max_intersection_pct > self.block_mode_intersection_thresh,
             block.block_type not in self.full_ocr_block_types,
@@ -121,6 +125,7 @@ class OcrBuilder(BaseBuilder):
         self, document: Document, pages: List[PageGroup], provider: PdfProvider
     ):
         highres_images, highres_polys, block_ids, block_original_texts = [], [], [], []
+        # TODO: i think we need to do something with tables and forms here but 
         for document_page in pages:
             page_highres_image = document_page.get_image(highres=True)
             page_highres_polys = []
@@ -211,6 +216,11 @@ class OcrBuilder(BaseBuilder):
                     # flatten all spans across lines
                     flat_spans = [s for line_spans in all_line_spans for s in line_spans]
                     self.replace_line_spans(document, document_page, block, flat_spans)
+                elif block.block_type in [BlockTypes.Table, BlockTypes.Form]:
+                    for line in block.contained_blocks(document_page, block_types=[BlockTypes.Line]):
+                        line.removed = True
+                    block.structure = []
+                    block.html = block_ocr_result.text
                 else:
                     # Clear out any old lines. Mark as removed for the json ocr renderer
                     for line in block.contained_blocks(document_page, block_types=[BlockTypes.Line]):
