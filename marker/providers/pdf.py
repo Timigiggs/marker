@@ -408,7 +408,11 @@ class PdfProvider(BaseProvider):
         if flatten_page:
             flatten_pdf_page(page)
             page = pdf[idx]
-        image = page.render(scale=dpi / 72, draw_annots=False).to_pil()
+        min_page_dim = min(page.get_width(), page.get_height())
+        min_dim_dpi = (768/ min_page_dim) * 72
+        target_dpi = max(min_dim_dpi, dpi)
+        scale = target_dpi / 72
+        image = page.render(scale=scale, draw_annots=False).to_pil()
         image = image.convert("RGB")
         return image
 

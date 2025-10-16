@@ -86,7 +86,7 @@ class LayoutBuilder(BaseBuilder):
     def surya_layout(self, pages: List[PageGroup]) -> List[LayoutResult]:
         self.layout_model.disable_tqdm = self.disable_tqdm
         layout_results = self.layout_model(
-            [p.get_image(highres=False) for p in pages],
+            [p.get_image(highres=True) for p in pages],
             batch_size=int(self.get_batch_size()),
         )
         return layout_results
